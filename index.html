@@ -701,68 +701,214 @@
     <section id="rtt">
       <h2>4) RTT Estimation & Timeout (how TCP picks retransmission time)</h2>
 
-      <div class="grid">
-        <div class="col-6">
-          <h3>Why timeout selection is tricky</h3>
-          <ul>
-            <li>Timeout must be <b>longer than RTT</b> (otherwise premature timeouts).</li>
-            <li>But RTT varies over time (route changes, queueing, load).</li>
-            <li><b>Too short</b> → unnecessary retransmissions. <b>Too long</b> → slow loss recovery.</li>
-          </ul>
+      <section id="rtt">
+  <h2>4) RTT Estimation & Timeout (how TCP picks retransmission time)</h2>
 
-          <h3>SampleRTT & EstimatedRTT</h3>
-          <ul>
-            <li><b>SampleRTT</b>: time from segment send → ACK receipt (ignore retransmissions).</li>
-            <li>Use smoothing to get <b>EstimatedRTT</b> (EWMA):</li>
-          </ul>
-          <div class="callout info">
-            <div class="mono">
-              EstimatedRTT = (1 − α) · EstimatedRTT + α · SampleRTT<br/>
-              Typical: α = 0.125
-            </div>
-          </div>
-          <p class="small">
-            “EWMA” means older samples matter less over time (their weight decays exponentially).
-          </p>
-        </div>
+  <div class="grid">
+    <div class="col-7">
+      <p>
+        TCP uses a <b>retransmission timer</b>. If an ACK doesn’t arrive before the timer expires, TCP assumes the
+        segment (or its ACK) was lost and <b>retransmits</b>. The hard part is choosing a timeout that is:
+        <b>not too small</b> (causes unnecessary retransmits) and <b>not too large</b> (slow loss recovery).
+      </p>
 
-        <div class="col-6">
-          <h3>Safety margin with DevRTT</h3>
+```
+  <div class="callout warn">
+    <b>Why timeout selection is tricky:</b>
+    <ul>
+      <li><b>RTT is not constant</b>: it changes with queueing delay, route changes, wireless effects, load, etc.</li>
+      <li><b>Too short timeout</b> → premature timeouts → extra retransmissions → wastes bandwidth + can worsen congestion.</li>
+      <li><b>Too long timeout</b> → you wait too long to detect real loss → throughput drops.</li>
+    </ul>
+  </div>
+
+  <h3>Step 1 — Measure SampleRTT (what exactly is measured?)</h3>
+  <p>
+    <b>SampleRTT</b> is measured for a segment that was sent once (no retransmission ambiguity):
+    time from when the segment is handed to IP → until an ACK arrives that <b>cumulatively acknowledges</b> it.
+  </p>
+
+  <div class="callout info">
+    <b>Important:</b> TCP usually takes SampleRTT measurements from <b>data segments</b> (not pure ACKs).
+    It samples repeatedly to track changing conditions.
+  </div>
+
+  <h3>Step 2 — Smooth RTT using EWMA (EstimatedRTT)</h3>
+  <p>
+    Raw SampleRTT values are “noisy”. TCP smooths them using an <b>EWMA</b> (Exponentially Weighted Moving Average).
+    The idea: <b>new samples influence the estimate</b>, but we don’t overreact to one spike.
+  </p>
+
+  <div class="callout ok">
+    <div class="mono">
+      EstimatedRTT = (1 − α) · EstimatedRTT + α · SampleRTT<br/>
+      Typical: α = 0.125
+    </div>
+  </div>
+
+  <p class="small">
+    <b>EWMA intuition (exam-friendly):</b> α decides how “responsive” you are.
+    Small α → very stable (slow to change). Large α → quickly adapts (but more jitter).
+  </p>
+
+  <div class="accordion">
+    <div class="acc">
+      <input id="rtt-ewma-intuition" type="checkbox" />
+      <label for="rtt-ewma-intuition">
+        <span>EWMA weight intuition (why “exponential”?)</span>
+        <i class="chev"></i>
+      </label>
+      <div class="content">
+        <div class="content-inner">
           <p>
-            TCP adds a safety margin that grows when RTT becomes “noisy”:
+            Expand the formula repeatedly and you’ll see older samples get multiplied by (1−α) many times:
+            their weight becomes (1−α)<sup>k</sup>. That’s why weights decay exponentially.
           </p>
-          <div class="callout ok">
-            <div class="mono">
-              DevRTT = (1 − β) · DevRTT + β · |SampleRTT − EstimatedRTT|<br/>
-              Typical: β = 0.25<br/><br/>
-              TimeoutInterval = EstimatedRTT + 4 · DevRTT
-            </div>
-          </div>
-
-          <div class="callout warn" style="margin-top:12px;">
-            <b>Exam cue:</b> The “4·DevRTT” term is the safety buffer. If variation increases → DevRTT increases → timeout increases.
-          </div>
-
-          <div class="accordion">
-            <div class="acc">
-              <input id="acc5" type="checkbox" />
-              <label for="acc5">
-                <span>Why ignore retransmitted segments for SampleRTT?</span>
-                <i class="chev"></i>
-              </label>
-              <div class="content">
-                <div class="content-inner">
-                  <p>
-                    If you retransmit, and then get an ACK, you can’t tell whether the ACK was for the first
-                    transmission or the retransmission. This ambiguity breaks RTT measurement (classic issue).
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
+          <p class="small">
+            So recent samples matter most, but older history still contributes a bit.
+          </p>
         </div>
       </div>
+    </div>
+  </div>
+
+  <h3>Step 3 — Measure RTT variability (DevRTT)</h3>
+  <p>
+    Two networks can have the same average RTT but very different “jitter”.
+    TCP tracks variability using <b>DevRTT</b>, which is a smoothed estimate of how far samples deviate from EstimatedRTT.
+  </p>
+
+  <div class="callout ok">
+    <div class="mono">
+      DevRTT = (1 − β) · DevRTT + β · |SampleRTT − EstimatedRTT|<br/>
+      Typical: β = 0.25
+    </div>
+  </div>
+
+  <p class="small">
+    If SampleRTT is sometimes far above or below EstimatedRTT, then |SampleRTT − EstimatedRTT| grows → DevRTT grows.
+  </p>
+</div>
+
+<div class="col-5">
+  <h3>Step 4 — Build TimeoutInterval (EstimatedRTT + safety buffer)</h3>
+  <p>
+    TCP adds a safety cushion so timeouts don’t fire just because RTT had a temporary spike.
+  </p>
+
+  <div class="callout warn">
+    <div class="mono">
+      TimeoutInterval = EstimatedRTT + 4 · DevRTT
+    </div>
+    <p class="small" style="margin-top:8px;">
+      <b>Exam cue:</b> The <b>4·DevRTT</b> term is the “safety buffer”. More jitter → larger DevRTT → larger timeout.
+    </p>
+  </div>
+
+  <div class="callout info" style="margin-top:12px;">
+    <b>Interpretation:</b><br/>
+    <ul>
+      <li><b>EstimatedRTT</b> = your best guess of the average delay.</li>
+      <li><b>DevRTT</b> = how uncertain/noisy that delay is.</li>
+      <li>Timeout = average + “margin for uncertainty”.</li>
+    </ul>
+  </div>
+
+  <div class="accordion" style="margin-top:12px;">
+    <div class="acc">
+      <input id="rtt-karn" type="checkbox" />
+      <label for="rtt-karn">
+        <span>Why ignore retransmitted segments for SampleRTT?</span>
+        <i class="chev"></i>
+      </label>
+      <div class="content">
+        <div class="content-inner">
+          <p>
+            If a segment is retransmitted, and then an ACK arrives, you <b>don’t know</b> which transmission
+            the ACK corresponds to:
+          </p>
+          <ul>
+            <li>It might be acknowledging the <b>original</b> send (delayed ACK).</li>
+            <li>Or it might be acknowledging the <b>retransmission</b>.</li>
+          </ul>
+          <div class="callout danger">
+            <b>This ambiguity breaks RTT measurement.</b> So TCP follows <b>Karn’s algorithm</b>:
+            <ul>
+              <li><b>Do not</b> take SampleRTT from retransmitted segments.</li>
+              <li>When timeout happens, TCP typically uses <b>exponential backoff</b> (timeout doubles) to be safer under congestion.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="acc">
+      <input id="rtt-worked-example" type="checkbox" />
+      <label for="rtt-worked-example">
+        <span>Worked numeric example (exam-style)</span>
+        <i class="chev"></i>
+      </label>
+      <div class="content">
+        <div class="content-inner">
+          <p class="mono">
+            Suppose:<br/>
+            α = 0.125, β = 0.25<br/>
+            Initial: EstimatedRTT = 100 ms, DevRTT = 5 ms<br/>
+            New SampleRTT = 140 ms
+          </p>
+          <p><b>1) Update EstimatedRTT</b></p>
+          <p class="mono">
+            EstimatedRTT = (1−0.125)*100 + 0.125*140<br/>
+            = 0.875*100 + 17.5<br/>
+            = 87.5 + 17.5 = 105 ms
+          </p>
+
+          <p><b>2) Update DevRTT</b></p>
+          <p class="mono">
+            |SampleRTT − EstimatedRTT| = |140 − 105| = 35 ms<br/>
+            DevRTT = (1−0.25)*5 + 0.25*35<br/>
+            = 0.75*5 + 8.75<br/>
+            = 3.75 + 8.75 = 12.5 ms
+          </p>
+
+          <p><b>3) Compute TimeoutInterval</b></p>
+          <p class="mono">
+            TimeoutInterval = 105 + 4*12.5 = 105 + 50 = 155 ms
+          </p>
+
+          <div class="callout ok">
+            <b>What this shows:</b> One high SampleRTT increased both the average (EstimatedRTT) and the uncertainty (DevRTT),
+            so timeout increased significantly to avoid premature retransmissions.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="acc">
+      <input id="rtt-traps" type="checkbox" />
+      <label for="rtt-traps">
+        <span>Common exam traps (memorize)</span>
+        <i class="chev"></i>
+      </label>
+      <div class="content">
+        <div class="content-inner">
+          <ul>
+            <li><b>SampleRTT</b> is measured for a segment that was <b>not retransmitted</b> (Karn’s rule).</li>
+            <li><b>DevRTT</b> is not “RTT” — it’s a measure of <b>variation</b>.</li>
+            <li>Timeout is not just EstimatedRTT — it’s <b>EstimatedRTT + safety margin</b>.</li>
+            <li>Smaller α → smoother EstimatedRTT (less reactive). Larger α → more reactive.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+```
+
+  </div>
+</section>
+
     </section>
 
     <!-- ===== Reliability mechanisms ===== -->
