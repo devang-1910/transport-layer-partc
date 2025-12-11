@@ -1,0 +1,1306 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Transport Layer (Part C) — Exam-Ready Notes (TCP)</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel: rgba(255,255,255,.06);
+      --panel2: rgba(255,255,255,.09);
+      --text:#e9eefc;
+      --muted: rgba(233,238,252,.75);
+      --accent:#7aa2ff;
+      --accent2:#7cf7c5;
+      --warn:#ffcc66;
+      --danger:#ff6b81;
+      --ok:#7cf7c5;
+      --border: rgba(255,255,255,.14);
+      --shadow: 0 18px 60px rgba(0,0,0,.45);
+      --radius: 18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    *{ box-sizing:border-box; }
+    html{ scroll-behavior:smooth; }
+    body{
+      margin:0;
+      font-family:var(--sans);
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 20% 5%, rgba(122,162,255,.23), transparent 55%),
+        radial-gradient(900px 500px at 90% 18%, rgba(124,247,197,.18), transparent 58%),
+        radial-gradient(1000px 700px at 40% 120%, rgba(255,204,102,.10), transparent 60%),
+        linear-gradient(180deg, #070a14, var(--bg) 30%, #050715);
+      min-height:100vh;
+      overflow-x:hidden;
+    }
+
+    /* ======= Top ambient grid + parallax-ish ======= */
+    .bg-grid{
+      position:fixed;
+      inset:-20%;
+      background-image:
+        linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+      background-size: 44px 44px;
+      transform: translateZ(0);
+      filter: blur(.2px);
+      opacity:.25;
+      pointer-events:none;
+      animation: drift 24s ease-in-out infinite alternate;
+      mix-blend-mode: screen;
+    }
+    @keyframes drift{
+      from{ transform: translate(-1.5%, -1%) scale(1); }
+      to{ transform: translate(1.5%, 1%) scale(1.03); }
+    }
+
+    /* ======= Layout ======= */
+    header{
+      position:relative;
+      padding:72px 24px 28px;
+      max-width:1100px;
+      margin:0 auto;
+    }
+    .hero{
+      border:1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+      box-shadow: var(--shadow);
+      border-radius: 26px;
+      padding: 28px 26px;
+      overflow:hidden;
+      position:relative;
+    }
+    .hero::before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      background:
+        radial-gradient(600px 180px at 20% 0%, rgba(122,162,255,.35), transparent 55%),
+        radial-gradient(600px 220px at 80% 20%, rgba(124,247,197,.28), transparent 58%),
+        radial-gradient(700px 260px at 50% 110%, rgba(255,204,102,.18), transparent 60%);
+      opacity:.55;
+      pointer-events:none;
+      animation: pulse 7s ease-in-out infinite alternate;
+    }
+    @keyframes pulse{
+      from{ transform: scale(1); filter: saturate(1); }
+      to{ transform: scale(1.02); filter: saturate(1.2); }
+    }
+    .hero > *{ position:relative; }
+    h1{
+      margin:0 0 10px;
+      font-size: clamp(26px, 3vw, 40px);
+      letter-spacing: -0.02em;
+      line-height:1.12;
+    }
+    .subtitle{
+      margin:0 0 14px;
+      color:var(--muted);
+      max-width: 70ch;
+      font-size: 15.5px;
+      line-height: 1.55;
+    }
+    .meta{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-top:16px;
+    }
+    .chip{
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      color: rgba(233,238,252,.86);
+      backdrop-filter: blur(10px);
+    }
+    .chip b{ color:var(--text); font-weight:600; }
+
+    /* ======= Sticky nav ======= */
+    nav{
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(12px);
+      background: rgba(6,9,18,.7);
+      border-bottom:1px solid rgba(255,255,255,.10);
+    }
+    .nav-inner{
+      max-width:1100px;
+      margin:0 auto;
+      padding: 10px 14px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:700;
+      letter-spacing:.2px;
+      font-size: 13px;
+      color: rgba(233,238,252,.92);
+      user-select:none;
+    }
+    .dot{
+      width:10px; height:10px; border-radius:50%;
+      background: conic-gradient(from 120deg, var(--accent), var(--accent2), var(--warn), var(--accent));
+      box-shadow: 0 0 18px rgba(122,162,255,.45);
+    }
+    .links{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+    .links a{
+      text-decoration:none;
+      color: rgba(233,238,252,.86);
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      transition: transform .15s ease, background .2s ease, border-color .2s ease;
+      white-space:nowrap;
+    }
+    .links a:hover{
+      transform: translateY(-1px);
+      background: rgba(255,255,255,.08);
+      border-color: rgba(255,255,255,.18);
+    }
+
+    main{
+      max-width:1100px;
+      margin: 0 auto;
+      padding: 18px 16px 90px;
+    }
+
+    section{
+      margin-top: 18px;
+      padding: 18px;
+      border:1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border-radius: var(--radius);
+      box-shadow: 0 14px 44px rgba(0,0,0,.30);
+      position:relative;
+      overflow:hidden;
+      animation: fadeUp .65s ease both;
+    }
+    section::after{
+      content:"";
+      position:absolute;
+      right:-90px; top:-110px;
+      width:240px; height:240px;
+      background: radial-gradient(circle at 30% 35%, rgba(122,162,255,.25), transparent 60%),
+                  radial-gradient(circle at 70% 65%, rgba(124,247,197,.16), transparent 62%);
+      opacity:.55;
+      transform: rotate(20deg);
+      pointer-events:none;
+      filter: blur(.2px);
+    }
+    @keyframes fadeUp{
+      from{ opacity:0; transform: translateY(10px); }
+      to{ opacity:1; transform: translateY(0); }
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap:14px;
+      align-items:stretch;
+    }
+    .col-6{ grid-column: span 6; }
+    .col-7{ grid-column: span 7; }
+    .col-5{ grid-column: span 5; }
+    .col-12{ grid-column: span 12; }
+    @media (max-width: 920px){
+      .col-6,.col-7,.col-5{ grid-column: span 12; }
+      header{ padding-top: 54px; }
+      .links{ justify-content:flex-start; }
+    }
+
+    h2{
+      margin:0 0 8px;
+      font-size: 20px;
+      letter-spacing: -0.015em;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    h3{
+      margin: 12px 0 6px;
+      font-size: 15.5px;
+      color: rgba(233,238,252,.96);
+      letter-spacing:-0.01em;
+    }
+    p, li{
+      color: rgba(233,238,252,.82);
+      line-height: 1.62;
+      font-size: 14.25px;
+    }
+    ul{ margin: 8px 0 0 18px; }
+    code, .mono{
+      font-family: var(--mono);
+      font-size: 12.8px;
+      color: rgba(233,238,252,.92);
+    }
+    .k{
+      font-family: var(--mono);
+      background: rgba(122,162,255,.15);
+      border:1px solid rgba(122,162,255,.22);
+      padding: 2px 6px;
+      border-radius: 8px;
+      white-space:nowrap;
+    }
+
+    /* ======= Callouts ======= */
+    .callout{
+      border:1px solid rgba(255,255,255,.12);
+      border-left-width: 4px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.04);
+      padding: 12px 12px;
+    }
+    .callout b{ color: rgba(233,238,252,.96); }
+    .info{ border-left-color: rgba(122,162,255,.9); }
+    .warn{ border-left-color: rgba(255,204,102,.95); }
+    .danger{ border-left-color: rgba(255,107,129,.95); }
+    .ok{ border-left-color: rgba(124,247,197,.95); }
+
+    /* ======= Tables ======= */
+    .table{
+      width:100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      overflow:hidden;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.12);
+    }
+    .table th, .table td{
+      padding: 10px 10px;
+      vertical-align: top;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      font-size: 13.5px;
+      line-height:1.45;
+      color: rgba(233,238,252,.84);
+    }
+    .table th{
+      text-align:left;
+      font-weight: 650;
+      color: rgba(233,238,252,.94);
+      background: rgba(255,255,255,.06);
+    }
+    .table tr:last-child td{ border-bottom: none; }
+
+    /* ======= Accordions (pure CSS) ======= */
+    .accordion{
+      display:grid;
+      gap:10px;
+      margin-top: 10px;
+    }
+    .acc{
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      border-radius: 14px;
+      overflow:hidden;
+    }
+    .acc input{ display:none; }
+    .acc label{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding: 12px 12px;
+      cursor:pointer;
+      user-select:none;
+      color: rgba(233,238,252,.92);
+      font-weight: 650;
+      font-size: 13.6px;
+    }
+    .acc label span{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .badge{
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.12);
+      color: rgba(233,238,252,.86);
+      font-weight:600;
+    }
+    .chev{
+      width: 12px; height: 12px;
+      border-right:2px solid rgba(233,238,252,.7);
+      border-bottom:2px solid rgba(233,238,252,.7);
+      transform: rotate(45deg);
+      transition: transform .2s ease;
+      margin-right: 2px;
+      flex: 0 0 auto;
+    }
+    .acc input:checked + label .chev{ transform: rotate(225deg); }
+    .content{
+      max-height:0;
+      overflow:hidden;
+      transition: max-height .25s ease;
+    }
+    .acc input:checked ~ .content{ max-height: 900px; }
+    .content-inner{ padding: 0 12px 12px; }
+
+    /* ======= Flashcards ======= */
+    .cards{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:12px;
+      margin-top:12px;
+    }
+    @media (max-width: 920px){ .cards{ grid-template-columns: 1fr; } }
+    .card{
+      position:relative;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      border-radius: 16px;
+      padding: 14px;
+      min-height: 150px;
+      overflow:hidden;
+      transform: translateZ(0);
+    }
+    .card::before{
+      content:"";
+      position:absolute;
+      inset:-1px;
+      background: radial-gradient(220px 140px at 20% 10%, rgba(122,162,255,.22), transparent 60%),
+                  radial-gradient(260px 160px at 80% 0%, rgba(124,247,197,.14), transparent 62%);
+      opacity:.7;
+      pointer-events:none;
+    }
+    .card *{ position:relative; }
+    .q{
+      font-weight:750;
+      font-size: 13.6px;
+      margin: 0 0 8px;
+      color: rgba(233,238,252,.95);
+    }
+    .a{ margin:0; color: rgba(233,238,252,.78); }
+
+    /* ======= Footer ======= */
+    footer{
+      max-width:1100px;
+      margin: 0 auto;
+      padding: 18px 16px 44px;
+      color: rgba(233,238,252,.62);
+      font-size: 12.5px;
+    }
+    .small{
+      font-size: 12.2px;
+      color: rgba(233,238,252,.66);
+    }
+
+    /* ======= Scroll snap (subtle) ======= */
+    .snap{
+      scroll-snap-type: y proximity;
+    }
+    section{ scroll-snap-align: start; }
+
+    /* ======= Print ======= */
+    @media print{
+      nav, .bg-grid{ display:none !important; }
+      body{ background:white; color:black; }
+      section, .hero{ box-shadow:none; background:white; border:1px solid #ddd; }
+      p, li{ color:#222; }
+      .chip, .callout, .card, .acc{ background:#fafafa; }
+    }
+  </style>
+</head>
+
+<body class="snap">
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <nav>
+    <div class="nav-inner">
+      <div class="brand"><span class="dot"></span>Transport Layer (Part C) — TCP</div>
+      <div class="links">
+        <a href="#tcp-overview">TCP Overview</a>
+        <a href="#segment">Segment</a>
+        <a href="#seq-ack">Seq/ACK</a>
+        <a href="#rtt">RTT & Timeout</a>
+        <a href="#reliability">Reliability</a>
+        <a href="#flow">Flow Control</a>
+        <a href="#conn">Connection Mgmt</a>
+        <a href="#congestion">Congestion</a>
+        <a href="#exam">Exam Pack</a>
+      </div>
+    </div>
+  </nav>
+
+  <header>
+    <div class="hero">
+      <h1>Transport Layer — Part C (TCP): Detailed, Exam‑Ready Notes</h1>
+      <p class="subtitle">
+        This page is a static <b>HTML + CSS only</b> study site that turns the Part‑C Transport Layer slides into
+        a clean, testable set of notes. Use the sticky menu to jump, open the accordions to drill details,
+        and use the flashcards at the end for quick revision.
+      </p>
+      <div class="meta">
+        <div class="chip"><b>Focus:</b> TCP reliability + flow + congestion</div>
+        <div class="chip"><b>Must‑know:</b> Seq/ACK, RTT, fast retransmit, cwnd/ssThresh</div>
+        <div class="chip"><b>Style:</b> Exam cues + common traps</div>
+        <div class="chip"><b>Tip:</b> Print mode supported (Ctrl/Cmd+P)</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ===== TCP overview ===== -->
+    <section id="tcp-overview">
+      <h2>1) TCP Overview (what TCP guarantees)</h2>
+      <div class="grid">
+        <div class="col-7">
+          <p>
+            <b>TCP</b> is the dominant <b>transport-layer protocol</b> that provides an application with a
+            <b>reliable, in-order, byte-stream</b> service on top of the network layer (IP), which is
+            <b>unreliable</b> (packets can be lost, corrupted, reordered, duplicated).
+          </p>
+
+          <div class="callout info">
+            <b>Exam cue:</b> TCP reliability is achieved using <span class="k">sequence numbers</span>,
+            <span class="k">ACKs</span>, and <span class="k">retransmissions</span> (triggered by timeouts or duplicate ACKs),
+            plus <span class="k">flow control</span> (rwnd) and <span class="k">congestion control</span> (cwnd).
+          </div>
+
+          <h3>Core properties (memorize the phrasing)</h3>
+          <ul>
+            <li><b>Point‑to‑point:</b> one sender ↔ one receiver per TCP connection.</li>
+            <li><b>Connection‑oriented:</b> uses <b>3‑way handshake</b> before data exchange.</li>
+            <li><b>Full‑duplex:</b> both directions can send simultaneously over one connection.</li>
+            <li><b>Reliable, in‑order byte stream:</b> delivers bytes without loss/alteration, and in order.</li>
+            <li><b>Pipelined:</b> multiple segments can be “in flight” (window-based).</li>
+            <li><b>Flow controlled:</b> sender won’t overflow receiver buffers (rwnd).</li>
+          </ul>
+        </div>
+
+        <div class="col-5">
+          <div class="callout warn">
+            <b>MSS (Maximum Segment Size):</b> controls max TCP payload per segment (excluding headers).
+            It is negotiated (via options) and affects how many bytes a segment carries.
+          </div>
+
+          <div class="accordion">
+            <div class="acc">
+              <input id="acc1" type="checkbox" />
+              <label for="acc1">
+                <span>TCP vs UDP (high‑level contrast)</span>
+                <i class="chev"></i>
+              </label>
+              <div class="content">
+                <div class="content-inner">
+                  <ul>
+                    <li><b>TCP:</b> connection-oriented, reliable, flow+congestion control → great for web, email, file transfer.</li>
+                    <li><b>UDP:</b> connectionless, best-effort, no built-in congestion control → often used for real-time audio/video where some loss is OK.</li>
+                  </ul>
+                  <p class="small">
+                    Note: fairness issues arise when UDP streams don't throttle during congestion (see Fairness section).
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="acc">
+              <input id="acc2" type="checkbox" />
+              <label for="acc2">
+                <span>What “byte stream” means (common MCQ trap)</span>
+                <i class="chev"></i>
+              </label>
+              <div class="content">
+                <div class="content-inner">
+                  <p>
+                    In TCP, <b>sequence numbers count bytes</b>, not segments. A segment’s sequence number is the
+                    <b>byte index of the first data byte</b> carried in that segment.
+                  </p>
+                  <p>
+                    So if MSS = 1000 and you send 500,000 bytes, sequence numbers go
+                    <span class="k">0, 1000, 2000, …, 499000</span>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Segment structure ===== -->
+    <section id="segment">
+      <h2>2) TCP Segment Structure (fields & what they do)</h2>
+      <p>
+        A TCP segment = <b>header</b> + <b>application data</b>. The header carries the information needed for
+        reliability, ordering, and control.
+      </p>
+
+      <div class="grid">
+        <div class="col-6">
+          <h3>Fields you must know</h3>
+          <ul>
+            <li><b>Source port / Destination port:</b> identify sending/receiving applications (multiplexing).</li>
+            <li><b>Sequence number:</b> byte index of <b>first</b> data byte in this segment.</li>
+            <li><b>Acknowledgment number:</b> byte index of <b>next expected</b> byte (cumulative ACK).</li>
+            <li><b>Receive window (rwnd):</b> how many bytes receiver is willing to accept (flow control).</li>
+            <li><b>Checksum:</b> detects corruption (like UDP internet checksum).</li>
+            <li><b>Header length:</b> where data begins (options make header variable length).</li>
+            <li><b>Options:</b> used for negotiation (e.g., MSS) and other features.</li>
+          </ul>
+          <div class="callout info">
+            <b>Exam cue:</b> <span class="k">rwnd</span> is for <b>flow control</b> (receiver protection). <span class="k">cwnd</span>
+            is for <b>congestion control</b> (network protection). Don’t mix them.
+          </div>
+        </div>
+
+        <div class="col-6">
+          <h3>Control flags (U A P R S F)</h3>
+          <table class="table" role="table" aria-label="TCP flags">
+            <thead>
+              <tr>
+                <th style="width:120px">Flag</th>
+                <th>Meaning (what to remember)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="k">SYN</span></td>
+                <td>Connection setup (part of 3-way handshake).</td>
+              </tr>
+              <tr>
+                <td><span class="k">FIN</span></td>
+                <td>Connection teardown (graceful close).</td>
+              </tr>
+              <tr>
+                <td><span class="k">RST</span></td>
+                <td>Reset/abort connection (error/invalid state).</td>
+              </tr>
+              <tr>
+                <td><span class="k">ACK</span></td>
+                <td>ACK field is valid (most data segments have ACK set after setup).</td>
+              </tr>
+              <tr>
+                <td><span class="k">PSH</span></td>
+                <td>“Push” data to app quickly (usually not emphasized in exams here).</td>
+              </tr>
+              <tr>
+                <td><span class="k">URG</span></td>
+                <td>Urgent data pointer valid (generally not used).</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout warn" style="margin-top:12px;">
+            <b>Common trap:</b> ACK number is not “the last byte received”. It is the
+            <b>next byte expected</b> → cumulative ACK semantics.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Seq/ACK ===== -->
+    <section id="seq-ack">
+      <h2>3) Sequence Numbers & ACKs (how TCP “keeps order”)</h2>
+
+      <div class="grid">
+        <div class="col-7">
+          <p>
+            TCP uses <b>cumulative acknowledgments</b>. Receiver sends ACK = <b>next byte index it expects</b>.
+            So if receiver has bytes up to 99 (0..99), it sends <span class="k">ACK=100</span>.
+          </p>
+
+          <div class="callout info">
+            <b>Key picture in your head:</b> Sender has a <b>sequence number space</b> split into:
+            <ul>
+              <li><b>Sent & ACKed</b> (left part)</li>
+              <li><b>Sent but not yet ACKed</b> (“in flight”)</li>
+              <li><b>Usable but not yet sent</b> (inside window)</li>
+              <li><b>Not usable</b> (outside window)</li>
+            </ul>
+            Sender tracks <span class="k">SendBase</span> (oldest unacked byte) and <span class="k">NextSeqNum</span>.
+          </div>
+
+          <h3>Mini scenario (like Telnet)</h3>
+          <p class="mono">
+            Host A sends 'C' with Seq=42, ACK=79<br/>
+            Host B ACKs and echoes 'C': Seq=79, ACK=43, data='C'<br/>
+            Host A ACKs echo: Seq=43, ACK=80
+          </p>
+          <p class="small">
+            The exact numbers don’t matter as much as the rule: <b>ACK = next expected byte</b>.
+          </p>
+        </div>
+
+        <div class="col-5">
+          <div class="accordion">
+            <div class="acc">
+              <input id="acc3" type="checkbox" />
+              <label for="acc3">
+                <span>Out-of-order segments: what does TCP do?</span>
+                <i class="chev"></i>
+              </label>
+              <div class="content">
+                <div class="content-inner">
+                  <p>
+                    The TCP spec doesn’t fully dictate how to handle out-of-order data; it’s implementation-dependent.
+                    Most implementations <b>buffer out-of-order segments</b>.
+                  </p>
+                  <div class="callout warn">
+                    <b>Exam cue:</b> Even if buffered, the receiver typically still sends
+                    <b>duplicate ACKs</b> for the <b>lowest missing byte</b> (the start of the gap).
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="acc">
+              <input id="acc4" type="checkbox" />
+              <label for="acc4">
+                <span>Why “cumulative ACK” matters</span>
+                <i class="chev"></i>
+              </label>
+              <div class="content">
+                <div class="content-inner">
+                  <p>
+                    If ACKs for earlier bytes are lost, a later ACK that covers them can still “confirm” delivery.
+                    This avoids retransmitting everything (unlike Go-Back-N).
+                  </p>
+                  <p>
+                    Example idea: If segments 1..N arrived but ACK<i>i</i> is lost, later ACKs
+                    might still move <span class="k">SendBase</span> forward, so TCP retransmits less.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="callout danger" style="margin-top:12px;">
+            <b>Trap:</b> Don’t confuse “window” in flow control (rwnd) with congestion window (cwnd).
+            TCP’s “effective send window” is often the minimum of both.
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== RTT & Timeout ===== -->
+    <section id="rtt">
+      <h2>4) RTT Estimation & Timeout (how TCP picks retransmission time)</h2>
+
+      <div class="grid">
+        <div class="col-6">
+          <h3>Why timeout selection is tricky</h3>
+          <ul>
+            <li>Timeout must be <b>longer than RTT</b> (otherwise premature timeouts).</li>
+            <li>But RTT varies over time (route changes, queueing, load).</li>
+            <li><b>Too short</b> → unnecessary retransmissions. <b>Too long</b> → slow loss recovery.</li>
+          </ul>
+
+          <h3>SampleRTT & EstimatedRTT</h3>
+          <ul>
+            <li><b>SampleRTT</b>: time from segment send → ACK receipt (ignore retransmissions).</li>
+            <li>Use smoothing to get <b>EstimatedRTT</b> (EWMA):</li>
+          </ul>
+          <div class="callout info">
+            <div class="mono">
+              EstimatedRTT = (1 − α) · EstimatedRTT + α · SampleRTT<br/>
+              Typical: α = 0.125
+            </div>
+          </div>
+          <p class="small">
+            “EWMA” means older samples matter less over time (their weight decays exponentially).
+          </p>
+        </div>
+
+        <div class="col-6">
+          <h3>Safety margin with DevRTT</h3>
+          <p>
+            TCP adds a safety margin that grows when RTT becomes “noisy”:
+          </p>
+          <div class="callout ok">
+            <div class="mono">
+              DevRTT = (1 − β) · DevRTT + β · |SampleRTT − EstimatedRTT|<br/>
+              Typical: β = 0.25<br/><br/>
+              TimeoutInterval = EstimatedRTT + 4 · DevRTT
+            </div>
+          </div>
+
+          <div class="callout warn" style="margin-top:12px;">
+            <b>Exam cue:</b> The “4·DevRTT” term is the safety buffer. If variation increases → DevRTT increases → timeout increases.
+          </div>
+
+          <div class="accordion">
+            <div class="acc">
+              <input id="acc5" type="checkbox" />
+              <label for="acc5">
+                <span>Why ignore retransmitted segments for SampleRTT?</span>
+                <i class="chev"></i>
+              </label>
+              <div class="content">
+                <div class="content-inner">
+                  <p>
+                    If you retransmit, and then get an ACK, you can’t tell whether the ACK was for the first
+                    transmission or the retransmission. This ambiguity breaks RTT measurement (classic issue).
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Reliability mechanisms ===== -->
+    <section id="reliability">
+      <h2>5) TCP Reliable Data Transfer (RDT over IP)</h2>
+
+      <div class="grid">
+        <div class="col-7">
+          <p>
+            TCP builds a reliable service (<b>rdt</b>) on top of IP’s unreliable service using:
+          </p>
+          <ul>
+            <li><b>Pipelined</b> segments (multiple in-flight)</li>
+            <li><b>Cumulative ACKs</b></li>
+            <li><b>Single retransmission timer</b> (for oldest unacked data)</li>
+            <li><b>Retransmissions</b> triggered by <b>timeout</b> or <b>duplicate ACKs</b></li>
+          </ul>
+
+          <h3>Simplified TCP sender (event-driven logic)</h3>
+          <div class="callout info">
+            <ul>
+              <li><b>Data from app:</b> create segment with seq# = NextSeqNum, send to IP, advance NextSeqNum, start timer if off.</li>
+              <li><b>Timeout:</b> retransmit the segment that caused timeout (oldest unacked), restart timer.</li>
+              <li><b>ACK received:</b> if ACK advances SendBase, update it; if still unacked data → keep timer; else stop timer.</li>
+            </ul>
+          </div>
+
+          <div class="callout warn">
+            <b>Important mental model:</b> Timer is “for the oldest unacked byte”.
+            TCP doesn’t keep a timer per segment in this simplified view.
+          </div>
+        </div>
+
+        <div class="col-5">
+          <h3>Retransmission scenarios (what exam questions test)</h3>
+          <div class="accordion">
+            <div class="acc">
+              <input id="acc6" type="checkbox" />
+              <label for="acc6">
+                <span><span class="badge">Scenario</span> Lost ACK → timeout retransmit</span>
+                <i class="chev"></i>
+              </label>
+              <div class="content">
+                <div class="content-inner">
+                  <p>
+                    Data arrives at receiver, receiver sends ACK, but ACK is lost.
+                    Sender’s timer expires and it retransmits the segment.
+                    Receiver may then re-ACK (duplicate data is handled via sequence numbers).
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="acc">
+              <input id="acc7" type="checkbox" />
+              <label for="acc7">
+                <span><span class="badge">Scenario</span> Premature timeout</span>
+                <i class="chev"></i>
+              </label>
+              <div class="content">
+                <div class="content-inner">
+                  <p>
+                    ACK is just delayed (not lost), but timeout is too short → sender retransmits unnecessarily.
+                    This is why timeout must include RTT variation (DevRTT).
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="acc">
+              <input id="acc8" type="checkbox" />
+              <label for="acc8">
+                <span><span class="badge">Scenario</span> Cumulative ACK “rescues” earlier loss</span>
+                <i class="chev"></i>
+              </label>
+              <div class="content">
+                <div class="content-inner">
+                  <p>
+                    If some ACK is lost, a later cumulative ACK can still confirm earlier bytes.
+                    Sender might retransmit at most one segment (or none if a later ACK arrives before timeout).
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <h3 style="margin-top:14px;">TCP ACK generation rules (RFC 1122 / RFC 2581)</h3>
+      <table class="table" role="table" aria-label="TCP ACK generation">
+        <thead>
+          <tr>
+            <th>Event at Receiver</th>
+            <th>Receiver Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>In-order segment with expected seq#, and no pending ACK</td>
+            <td><b>Delayed ACK</b>: wait up to ~500ms for next segment; if none, send ACK.</td>
+          </tr>
+          <tr>
+            <td>In-order segment with expected seq#, but one ACK already pending</td>
+            <td><b>Send single cumulative ACK immediately</b> (ACKing both in-order segments).</td>
+          </tr>
+          <tr>
+            <td>Out-of-order segment (higher-than-expected seq#): gap detected</td>
+            <td><b>Immediately send duplicate ACK</b> indicating next expected byte.</td>
+          </tr>
+          <tr>
+            <td>Segment that partially/completely fills gap</td>
+            <td><b>Send ACK immediately</b> if segment starts at lower end of the gap.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="grid" style="margin-top:14px;">
+        <div class="col-6">
+          <h3>Fast Retransmit (triple duplicate ACK)</h3>
+          <p>
+            Timeout can be long → waiting for it may delay recovery. TCP can infer loss earlier:
+          </p>
+          <div class="callout ok">
+            <b>Rule:</b> If sender receives <b>3 duplicate ACKs</b> (same ACK number repeated),
+            it <b>immediately retransmits</b> the unacked segment with the <b>smallest seq#</b>.
+          </div>
+          <p class="small">
+            Intuition: if later segments arrived, receiver keeps ACKing the missing byte → duplicates accumulate.
+          </p>
+        </div>
+
+        <div class="col-6">
+          <h3>Go-Back-N or Selective Repeat?</h3>
+          <div class="callout info">
+            TCP <i>resembles</i> Go-Back-N because it tracks <span class="k">SendBase</span> (oldest unacked),
+            but behaves differently:
+            <ul>
+              <li>TCP receivers often <b>buffer out-of-order</b> segments.</li>
+              <li>If ACK<i>i</i> is lost but later ACKs arrive:
+                <b>GBN retransmits all from i onward</b>, but <b>TCP retransmits at most one segment</b> (often only i).
+              </li>
+              <li>TCP can be enhanced via <b>Selective Acknowledgment (SACK)</b> (conceptual mention).</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ===== Flow control ===== -->
+    <section id="flow">
+      <h2>6) TCP Flow Control (rwnd & credit)</h2>
+
+      <div class="grid">
+        <div class="col-7">
+          <p>
+            <b>Flow control</b> prevents a fast sender from overflowing a slow receiver’s socket buffer.
+            Receiver “advertises” its free buffer space to the sender via <span class="k">rwnd</span> in the TCP header.
+          </p>
+          <ul>
+            <li><span class="k">RcvBuffer</span>: receiver buffer capacity (OS/socket setting; many OSes auto-adjust).</li>
+            <li><span class="k">rwnd</span>: free space in that buffer.</li>
+            <li>Sender limits <b>unacked in-flight bytes</b> ≤ <span class="k">rwnd</span>.</li>
+          </ul>
+
+          <div class="callout info">
+            <b>Exam cue (one-liner):</b> <span class="k">rwnd</span> is the receiver’s “credit” telling the sender
+            how many more bytes it can safely send without overflow.
+          </div>
+
+          <div class="accordion">
+            <div class="acc">
+              <input id="acc9" type="checkbox" />
+              <label for="acc9">
+                <span>Credit mechanism intuition (visual)</span>
+                <i class="chev"></i>
+              </label>
+              <div class="content">
+                <div class="content-inner">
+                  <p>
+                    Think of the receiver buffer as a tank:
+                    <b>buffered data</b> occupies part of it, <b>free space</b> is the remaining.
+                    Receiver advertises that free space as <span class="k">rwnd</span>.
+                    Each incoming segment “consumes” space; application reads data and frees space.
+                  </p>
+                  <div class="callout warn">
+                    If the receiver app reads slowly, rwnd shrinks → sender must slow down even if the network is empty.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="col-5">
+          <div class="callout danger">
+            <b>Flow control ≠ Congestion control</b><br/>
+            Flow control is end-to-end and protects the <b>receiver</b>.
+            Congestion control protects the <b>network</b> and reacts to router buffer overflow / delays.
+          </div>
+
+          <h3>Practical note (exam-style)</h3>
+          <ul>
+            <li>If <span class="k">rwnd = 0</span>, sender must stop sending (except for probes depending on implementation).</li>
+            <li>In practice, send window is bounded by both rwnd and cwnd (often min).</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Connection management ===== -->
+    <section id="conn">
+      <h2>7) TCP Connection Management (setup & teardown)</h2>
+
+      <div class="grid">
+        <div class="col-6">
+          <h3>Why 2-way handshake can fail</h3>
+          <p>
+            “Client requests, server accepts” sounds enough, but two-way handshake can create
+            <b>half-open connections</b> and confusion when old (retransmitted/delayed) connection requests appear.
+          </p>
+
+          <div class="callout warn">
+            <b>Half-open connection:</b> server believes connection exists, but client is gone (terminated / timed out).
+            This can happen with delayed retransmissions and state mismatch.
+          </div>
+
+          <div class="accordion">
+            <div class="acc">
+              <input id="acc10" type="checkbox" />
+              <label for="acc10">
+                <span>Sequence numbers are huge (why it matters)</span>
+                <i class="chev"></i>
+              </label>
+              <div class="content">
+                <div class="content-inner">
+                  <p>
+                    TCP’s sequence number field is <b>32-bit</b> → over 4 billion possible numbers.
+                    Using fresh initial sequence numbers helps distinguish new data from old duplicates.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="col-6">
+          <h3>3-way handshake (the correct approach)</h3>
+          <div class="callout ok">
+            <ol style="margin:8px 0 0 18px;">
+              <li><b>Client → Server:</b> <span class="k">SYN</span>, seq = x</li>
+              <li><b>Server → Client:</b> <span class="k">SYN+ACK</span>, seq = y, ack = x+1</li>
+              <li><b>Client → Server:</b> <span class="k">ACK</span>, ack = y+1</li>
+            </ol>
+          </div>
+          <p class="small">
+            After step 3, both sides agree on initial sequence numbers and the connection is established.
+          </p>
+
+          <h3>Disconnect (teardown)</h3>
+          <p>
+            TCP uses a controlled close using <span class="k">FIN</span> (and ACKs). Each direction is closed
+            independently (because TCP is full duplex).
+          </p>
+
+          <div class="callout info">
+            <b>Exam cue:</b> Setup = SYN; Teardown = FIN; Abort = RST.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Congestion control ===== -->
+    <section id="congestion">
+      <h2>8) Congestion Control (the “network is overloaded” problem)</h2>
+
+      <div class="grid">
+        <div class="col-7">
+          <p>
+            <b>Congestion</b> occurs when too many sources send too much too fast for the network to handle.
+            It’s different from flow control.
+          </p>
+          <div class="callout danger">
+            <b>Manifestations:</b> packet loss (router buffer overflow) + long delays (queueing).
+          </div>
+
+          <h3>Two broad approaches</h3>
+          <table class="table" role="table" aria-label="Congestion control approaches">
+            <thead>
+              <tr>
+                <th>End-to-end</th>
+                <th>Network-assisted</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  No explicit feedback from routers.<br/>
+                  Sender infers congestion from <b>loss</b> or <b>delay</b> observed at endpoints.<br/>
+                  <b>TCP uses this.</b>
+                </td>
+                <td>
+                  Routers provide feedback (e.g., a congestion bit or explicit rate).<br/>
+                  Examples mentioned historically: DECbit, ECN, ATM style explicit rates.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>General congestion-handling techniques (concept list)</h3>
+          <ul>
+            <li><b>Packet elimination:</b> drop packets under heavy buildup (reduces load but causes loss).</li>
+            <li><b>Flow control:</b> limits sender (not a complete congestion solution; congestion can be multi-source).</li>
+            <li><b>Buffer allocation:</b> reserve buffers (useful in virtual circuits).</li>
+            <li><b>Choke packets:</b> routers warn sender to slow down for a time period.</li>
+          </ul>
+
+        </div>
+
+        <div class="col-5">
+          <h3>TCP’s key congestion questions</h3>
+          <div class="callout info">
+            TCP asks:
+            <ol style="margin:8px 0 0 18px;">
+              <li>How to <b>detect</b> congestion?</li>
+              <li>What to do to <b>limit</b> sending rate?</li>
+              <li>How to <b>adapt</b> when congestion changes?</li>
+            </ol>
+          </div>
+
+          <div class="accordion">
+            <div class="acc">
+              <input id="acc11" type="checkbox" />
+              <label for="acc11">
+                <span>How TCP detects congestion</span>
+                <i class="chev"></i>
+              </label>
+              <div class="content">
+                <div class="content-inner">
+                  <ul>
+                    <li><b>Timeout</b> (loss suspected/observed)</li>
+                    <li><b>Three duplicate ACKs</b> (Reno fast retransmit signal)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="acc">
+              <input id="acc12" type="checkbox" />
+              <label for="acc12">
+                <span>cwnd: the congestion window</span>
+                <i class="chev"></i>
+              </label>
+              <div class="content">
+                <div class="content-inner">
+                  <p>
+                    TCP maintains <span class="k">cwnd</span>, which limits how much data can be “in flight”
+                    to avoid overwhelming the network.
+                    cwnd increases when network looks healthy and decreases when congestion is suspected.
+                  </p>
+                  <div class="callout warn">
+                    <b>Exam trap:</b> rwnd protects receiver buffer; cwnd protects network buffers.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <h3 style="margin-top:14px;">AIMD + Slow Start + Reno/Tahoe (must-know behaviors)</h3>
+      <div class="grid">
+        <div class="col-6">
+          <div class="callout ok">
+            <b>AIMD (Additive Increase, Multiplicative Decrease)</b>
+            <ul>
+              <li><b>Additive increase:</b> increase sending rate gradually (probe bandwidth) — typically ~ +1 MSS per RTT (conceptually).</li>
+              <li><b>Multiplicative decrease:</b> on loss, cut sending rate (often halve cwnd, or set to 1 MSS depending on variant).</li>
+            </ul>
+          </div>
+
+          <div class="callout info" style="margin-top:12px;">
+            <b>Slow Start:</b> start with <span class="k">cwnd = 1 MSS</span> and grow <b>exponentially</b>:
+            cwnd doubles every RTT (by increasing cwnd on each ACK).
+          </div>
+        </div>
+
+        <div class="col-6">
+          <div class="callout warn">
+            <b>Loss reaction differences</b>
+            <ul>
+              <li><b>Timeout:</b> cwnd → 1 MSS, then exponential growth up to threshold, then linear.</li>
+              <li><b>3 duplicate ACKs (TCP Reno):</b> cwnd is cut in half, then grows linearly.</li>
+              <li><b>TCP Tahoe:</b> cwnd → 1 MSS for both timeout and triple-dup-ACK events.</li>
+            </ul>
+          </div>
+
+          <div class="callout ok" style="margin-top:12px;">
+            <b>ssthresh (slow start threshold)</b>
+            <ul>
+              <li>On loss, set <span class="k">ssthresh = cwnd / 2</span>.</li>
+              <li>Slow start (exponential) continues until cwnd reaches ssthresh, then congestion avoidance (linear) begins.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin-top:14px;">Throughput & fairness (what they might ask)</h3>
+      <div class="grid">
+        <div class="col-6">
+          <div class="callout info">
+            <b>Average throughput (simplified):</b><br/>
+            If loss occurs at window size <span class="k">W</span> bytes, window varies from W/2 to W,
+            average ≈ 3/4 W, so:<br/>
+            <span class="mono">avg throughput ≈ (3/4 · W) / RTT</span> (bytes/sec)
+          </div>
+          <p class="small">
+            This is a high-level estimation used for intuition (ignore slow start).
+          </p>
+        </div>
+
+        <div class="col-6">
+          <div class="callout warn">
+            <b>Fairness goal:</b> If K TCP sessions share a bottleneck link of rate R,
+            each should get ~ R/K average rate.
+          </div>
+          <div class="callout danger" style="margin-top:12px;">
+            <b>Why fairness can break:</b>
+            <ul>
+              <li><b>UDP flows</b> may not throttle (constant-rate multimedia).</li>
+              <li>Apps can open <b>multiple parallel TCP connections</b> to grab more than their “fair share”.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ===== Exam pack ===== -->
+    <section id="exam">
+      <h2>9) Exam Pack (what to memorize + common traps)</h2>
+
+      <div class="grid">
+        <div class="col-6">
+          <h3>Must-memorize formulas</h3>
+          <div class="callout info">
+            <div class="mono">
+              EstimatedRTT = (1 − α)·EstimatedRTT + α·SampleRTT (α ≈ 0.125)<br/>
+              DevRTT = (1 − β)·DevRTT + β·|SampleRTT − EstimatedRTT| (β ≈ 0.25)<br/>
+              TimeoutInterval = EstimatedRTT + 4·DevRTT
+            </div>
+          </div>
+
+          <h3>Must-memorize trigger rules</h3>
+          <ul>
+            <li><b>Fast retransmit:</b> 3 duplicate ACKs → resend smallest unacked segment immediately.</li>
+            <li><b>Timeout:</b> resend oldest unacked; restart timer.</li>
+            <li><b>ACK meaning:</b> ACK = <b>next expected byte</b> (cumulative).</li>
+          </ul>
+
+          <div class="callout warn">
+            <b>Quick differentiation:</b>
+            <ul>
+              <li><b>Flow control</b> (rwnd): receiver buffer protection</li>
+              <li><b>Congestion control</b> (cwnd): network protection</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="col-6">
+          <h3>Flashcards (rapid revision)</h3>
+          <div class="cards">
+            <div class="card">
+              <p class="q">Q: What does a TCP sequence number represent?</p>
+              <p class="a">A: The byte-stream number (index) of the <b>first</b> data byte in the segment.</p>
+            </div>
+            <div class="card">
+              <p class="q">Q: What does ACK=120 mean?</p>
+              <p class="a">A: Receiver has all bytes up to 119 and expects byte 120 next (cumulative ACK).</p>
+            </div>
+            <div class="card">
+              <p class="q">Q: Why is timeout = EstimatedRTT + 4·DevRTT?</p>
+              <p class="a">A: EstimatedRTT sets the baseline; 4·DevRTT adds a safety margin for RTT variability.</p>
+            </div>
+            <div class="card">
+              <p class="q">Q: What event triggers fast retransmit?</p>
+              <p class="a">A: <b>Triple duplicate ACKs</b> for the same ACK number.</p>
+            </div>
+            <div class="card">
+              <p class="q">Q: Reno vs Tahoe on 3 dup ACKs?</p>
+              <p class="a">A: Reno halves cwnd then linear growth; Tahoe sets cwnd to 1 MSS.</p>
+            </div>
+            <div class="card">
+              <p class="q">Q: Congestion vs flow control?</p>
+              <p class="a">A: Congestion = network overloaded (router buffers); flow control = receiver buffer protection (rwnd).</p>
+            </div>
+          </div>
+
+          <div class="accordion" style="margin-top:14px;">
+            <div class="acc">
+              <input id="acc13" type="checkbox" />
+              <label for="acc13">
+                <span>Common MCQ traps checklist</span>
+                <i class="chev"></i>
+              </label>
+              <div class="content">
+                <div class="content-inner">
+                  <ul>
+                    <li>Seq/ACK count <b>bytes</b>, not segments.</li>
+                    <li>ACK is <b>next expected</b>, not “last received”.</li>
+                    <li>rwnd (receiver) vs cwnd (network) confusion.</li>
+                    <li>Timeout vs triple duplicate ACK implies different TCP behavior (Reno/Tahoe).</li>
+                    <li>2-way handshake failure: half-open connection risk → TCP uses 3-way handshake.</li>
+                    <li>Congestion control is “top-10 problem” because it impacts loss/delay and throughput fairness.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer>
+    <div>
+      <b>Source basis:</b> Transport Layer Part‑C lecture slides (TCP overview, segment structure, seq/ACK behavior, RTT/timeout equations, fast retransmit, flow control, handshake, and congestion control topics).
+    </div>
+    <div class="small" style="margin-top:8px;">
+      Built as a single-file HTML+CSS study page (no JavaScript). You can save it locally and open in any browser.
+    </div>
+  </footer>
+</body>
+</html>
